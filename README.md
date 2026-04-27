@@ -55,7 +55,7 @@ sudo apt install ./dist/notepadpp-linux_1.0.0_all.deb
 
 ```ini
 [Desktop Entry]
-Version=0.1.0
+Version=1.0.0
 Type=Application
 Name=Notepad Light Linux
 Exec=python3 /ABSOLUTE/PATH/TO/notepadpp_linux.py
