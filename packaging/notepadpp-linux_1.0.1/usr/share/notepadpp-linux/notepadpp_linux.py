@@ -390,7 +390,6 @@ class NotepadLinuxWindow(Gtk.ApplicationWindow):
             self.encoding_menu_items[encoding] = item
 
         self._toggle_dark_theme(dark_item)
-        menu_bar.show_all()
         return menu_bar
 
     def _append_menu_item(self, menu: Gtk.Menu, label: str, callback, accel: str) -> None:

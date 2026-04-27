@@ -1,6 +1,12 @@
 {
   "markdownlint.ignore": [
     "**/DEBIAN/control",
-    "**/DEBIAN/**"
-  ]
+    "**/DEBIAN/**",
+    "/plans/**",
+    "README.md"
+  ],
+  "[xml]": {
+    "editor.formatOnSave": false
+  },
+  "python.analysis.autoImportCompletions": true
 }

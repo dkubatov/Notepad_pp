@@ -1,0 +1,10 @@
+Package: notepadpp-linux
+Version: 1.1.2
+Section: editors
+Priority: optional
+Architecture: all
+Maintainer: NotepadPP Linux Maintainers <maintainers@example.com>
+Depends: python3, python3-gi, gir1.2-gtk-3.0, gir1.2-gtksource-3.0
+Description: Notepad++-style text editor for Debian and Ubuntu
+ Lightweight multi-tab text editor with syntax highlighting,
+ find/replace, session restore, and desktop integration.

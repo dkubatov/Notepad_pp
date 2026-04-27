@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<language id="1c-ent" name="1C Enterprise" version="2.0" _section="Sources">
+  <metadata>
+    <property name="mimetypes">text/x-1c-ent</property>
+    <property name="globs">*.os;*.bsl</property>
+    <property name="line-comment-start">//</property>
+    <property name="block-comment-start">/*</property>
+    <property name="block-comment-end">*/</property>
+  </metadata>
+  <styles>
+    <style id="comment" name="Comment" map-to="def:comment"/>
+    <style id="string" name="String" map-to="def:string"/>
+    <style id="keyword" name="Keyword" map-to="def:keyword"/>
+    <style id="number" name="Number" map-to="def:number"/>
+    <style id="preprocessor" name="Preprocessor" map-to="def:preprocessor"/>
+    <style id="constant" name="Constant" map-to="def:constant"/>
+    <style id="function" name="Builtin Function" map-to="def:builtin"/>
+    <style id="date-const" name="Date Constant" map-to="def:special-constant"/>
+    <style id="annotation" name="Annotation" map-to="def:preprocessor"/>
+  </styles>
+  <definitions>
+    <context id="1c-ent" class="no-spell-check">
+      <include>
+        <context ref="line-comment"/>
+        <context ref="block-comment"/>
+        <context ref="string-double"/>
+        <context ref="date-constant"/>
+        <context ref="number"/>
+        <context ref="constant"/>
+        <context ref="preprocessor-line"/>
+        <context ref="preprocessor-region"/>
+        <context ref="annotations"/>
+        <context ref="keywords"/>
+        <context ref="builtin-funcs"/>
+      </include>
+    </context>
+    <context id="line-comment" style-ref="comment">
+      <start>//</start>
+      <end>$</end>
+    </context>
+    <context id="block-comment" style-ref="comment" end-at-line-end="true">
+      <start>/\*</start>
+      <end>\*/</end>
+      <include>
+        <context ref="block-comment"/>
+      </include>
+    </context>
+    <context id="string-double" style-ref="string" end-at-line-end="true">
+      <start>"</start>
+      <end>"</end>
+    </context>
+    <context id="date-constant" style-ref="date-const">
+      <match>'[0-9]{4,8}([^']*[0-9]{1,6})?'</match>
+    </context>
+    <context id="number" style-ref="number">
+      <match>[-+]?[0-9]+(\.[0-9]+)?</match>
+    </context>
+    <context id="constant" style-ref="constant">
+      <keyword>Неопределено</keyword>
+      <keyword>Undefined</keyword>
+      <keyword>Истина</keyword>
+      <keyword>True</keyword>
+      <keyword>Ложь</keyword>
+      <keyword>False</keyword>
+      <keyword>NULL</keyword>
+    </context>
+    <context id="preprocessor-line" style-ref="preprocessor">
+      <keyword>Если</keyword>
+      <keyword>If</keyword>
+      <keyword>ИначеЕсли</keyword>
+      <keyword>ElsIf</keyword>
+      <keyword>Иначе</keyword>
+      <keyword>Else</keyword>
+      <keyword>КонецЕсли</keyword>
+      <keyword>EndIf</keyword>
+      <keyword>Вставка</keyword>
+      <keyword>Insert</keyword>
+      <keyword>КонецВставки</keyword>
+      <keyword>EndInsert</keyword>
+      <keyword>Удаление</keyword>
+      <keyword>Delete</keyword>
+      <keyword>КонецУдаления</keyword>
+      <keyword>EndDelete</keyword>
+      <keyword>Использовать</keyword>
+      <keyword>Use</keyword>
+    </context>
+    <context id="preprocessor-region" style-ref="preprocessor">
+      <keyword>Область</keyword>
+      <keyword>Region</keyword>
+      <keyword>КонецОбласти</keyword>
+      <keyword>EndRegion</keyword>
+    </context>
+    <context id="annotations" style-ref="annotation">
+      <match>(?i)&amp;([a-zа-яё0-9_]+)</match>
+    </context>
+    <context id="keywords" style-ref="keyword">
+      <keyword>Процедура</keyword>
+      <keyword>Procedure</keyword>
+      <keyword>КонецПроцедуры</keyword>
+      <keyword>EndProcedure</keyword>
+      <keyword>Функция</keyword>
+      <keyword>Function</keyword>
+      <keyword>КонецФункции</keyword>
+      <keyword>EndFunction</keyword>
+      <keyword>Если</keyword>
+      <keyword>If</keyword>
+      <keyword>Тогда</keyword>
+      <keyword>Then</keyword>
+      <keyword>КонецЕсли</keyword>
+      <keyword>EndIf</keyword>
+      <keyword>Пока</keyword>
+      <keyword>While</keyword>
+      <keyword>Цикл</keyword>
+      <keyword>Do</keyword>
+      <keyword>КонецЦикла</keyword>
+      <keyword>EndDo</keyword>
+      <keyword>Для</keyword>
+      <keyword>For</keyword>
+      <keyword>Каждого</keyword>
+      <keyword>Each</keyword>
+      <keyword>Из</keyword>
+      <keyword>In</keyword>
+      <keyword>По</keyword>
+      <keyword>To</keyword>
+      <keyword>Перем</keyword>
+      <keyword>Var</keyword>
+      <keyword>Экспорт</keyword>
+      <keyword>Export</keyword>
+      <keyword>Возврат</keyword>
+      <keyword>Return</keyword>
+      <keyword>Знач</keyword>
+      <keyword>Val</keyword>
+      <keyword>Попытка</keyword>
+      <keyword>Try</keyword>
+      <keyword>Исключение</keyword>
+      <keyword>Except</keyword>
+      <keyword>КонецПопытки</keyword>
+      <keyword>EndTry</keyword>
+      <keyword>ВызватьИсключение</keyword>
+      <keyword>Raise</keyword>
+      <keyword>Прервать</keyword>
+      <keyword>Break</keyword>
+      <keyword>Продолжить</keyword>
+      <keyword>Continue</keyword>
+      <keyword>Новый</keyword>
+      <keyword>New</keyword>
+      <keyword>И</keyword>
+      <keyword>AND</keyword>
+      <keyword>ИЛИ</keyword>
+      <keyword>OR</keyword>
+      <keyword>НЕ</keyword>
+      <keyword>NOT</keyword>
+    </context>
+    <context id="builtin-funcs" style-ref="function">
+      <match>(?i)\b(СтрДлина|StrLen|СокрЛ|TrimL|СокрП|TrimR|СокрЛП|TrimAll|Лев|Left|Прав|Right|Сред|Mid|СтрНайти|StrFind|ВРег|Upper|НРег|Lower|ТРег|Title|Символ|Char|КодСимвола|CharCode|ПустаяСтрока|IsBlankString|СтрЗаменить|StrReplace|СтрЧислоСтрок|StrLineCount|СтрПолучитьСтроку|StrGetLine|СтрРазделить|StrSplit|СтрСоединить|StrConcat|Цел|Int|Окр|Round|Год|Year|Месяц|Month|День|Day|Час|Hour|Минута|Minute|Секунда|Second|НачалоГода|BegOfYear|НачалоДня|BegOfDay|НачалоКвартала|BegOfQuarter|НачалоМесяца|BegOfMonth|КонецГода|EndOfYear|КонецДня|EndOfDay|КонецКвартала|EndOfQuarter|КонецМесяца|EndOfMonth|НеделяГода|WeekOfYear|ДеньГода|DayOfYear|ДеньНедели|WeekDay|ТекущаяДата|CurrentDate|ДобавитьМесяц|AddMonth|Тип|Type|ТипЗнч|TypeOf|Формат|Format|Сообщить|Message|Предупреждение|DoMessageBox|Вопрос|DoQueryBox|Сигнал|Beep|Состояние|Status|ПустоеЗначение|IsEmpty|ЗаполнитьЗначенияСвойств|FillPropertyValues|Min|Max|Мин|Макс)\s*(?=\()</match>
+    </context>
+  </definitions>
+</language>

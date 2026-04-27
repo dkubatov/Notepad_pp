@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<language id="csv" name="CSV" version="1.0" _section="Data">
+  <metadata>
+    <property name="mimetypes">text/csv</property>
+    <property name="globs">*.csv</property>
+  </metadata>
+
+  <styles>
+    <style id="separator" name="Separator" map-to="def:specials"/>
+    <style id="quoted" name="Quoted String" map-to="def:string"/>
+    <style id="comment" name="Comment" map-to="def:comment"/>
+  </styles>
+
+  <definitions>
+    <context id="csv">
+      <include>
+        <context ref="comments"/>
+        <context ref="quoted-field"/>
+        <context ref="separators"/>
+      </include>
+    </context>
+
+    <context id="comments" style-ref="comment">
+      <start>#</start>
+      <end>$</end>
+    </context>
+
+    <context id="quoted-field" style-ref="quoted">
+      <start>"</start>
+      <end>"</end>
+    </context>
+
+    <context id="separators" style-ref="separator">
+      <match>[,\;\t\|]</match>
+    </context>
+  </definitions>
+</language>
