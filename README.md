@@ -1,7 +1,9 @@
 # Notepad Light for Linux (Debian/Ubuntu)
 
 Легкий текстовый редактор с интерфейсом в стиле Notepad++ для Linux.
-Вдохновлен: Официальный проект Notepad++ (Windows): https://github.com/notepad-plus-plus/notepad-plus-plus
+Вдохновлен: Официальный проект Notepad++ (Windows): <https://github.com/notepad-plus-plus/notepad-plus-plus>
+
+**Версия:** 1.0.1
 
 ## Что реализовано
 
@@ -30,20 +32,21 @@ python3 notepadpp_linux.py
 
 ## Сборка Debian-пакета
 
-Готовый пакет уже собирается из каталога `packaging/notepadpp-linux_1.0.0`.
+Готовый пакет уже собирается из каталога `packaging/notepadpp-linux_1.0.1`.
 
 ```bash
 mkdir -p dist
-dpkg-deb --build packaging/notepadpp-linux_1.0.0 dist/notepadpp-linux_1.0.0_all.deb
+dpkg-deb --build packaging/notepadpp-linux_1.0.1 dist/notepadpp-linux_1.0.1_all.deb
 ```
 
 Установка:
 
 ```bash
-sudo apt install ./dist/notepadpp-linux_1.0.0_all.deb
+sudo apt install ./dist/notepadpp-linux_1.0.1_all.deb
 ```
 
 После установки появятся:
+
 - пункт меню `Notepad Light Linux`;
 - иконка приложения (`notepadpp-linux.svg`);
 - файловые ассоциации через `.desktop` (`text/plain`, `json`, `xml`, `markdown`, `python`, `shell`, `c/c++`, `java`);
@@ -55,7 +58,7 @@ sudo apt install ./dist/notepadpp-linux_1.0.0_all.deb
 
 ```ini
 [Desktop Entry]
-Version=1.0.0
+Version=1.0.1
 Type=Application
 Name=Notepad Light Linux
 Exec=python3 /ABSOLUTE/PATH/TO/notepadpp_linux.py

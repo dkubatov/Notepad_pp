@@ -1,0 +1,6 @@
+{
+  "markdownlint.ignore": [
+    "**/DEBIAN/control",
+    "**/DEBIAN/**"
+  ]
+}

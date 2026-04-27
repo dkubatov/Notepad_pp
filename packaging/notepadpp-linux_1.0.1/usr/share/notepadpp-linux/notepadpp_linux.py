@@ -6,7 +6,6 @@ Notepad light - a lightweight Notepad++-style editor for Debian/Ubuntu.
 from __future__ import annotations
 
 import json
-import os
 import re
 import sys
 import webbrowser
@@ -79,7 +78,6 @@ class EditorTab(Gtk.Box):
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         self.path = path
         self.modified = False
-        self.search_mark = None
         self.encoding = encoding
 
         self.buffer = GtkSource.Buffer()
@@ -217,14 +215,6 @@ class EditorTab(Gtk.Box):
             source_lang = lang_manager.get_language(language)
             if source_lang:
                 self.buffer.set_language(source_lang)
-
-    def load_file(self, path: Path) -> None:
-        text = path.read_text(encoding=self.encoding)
-        self.path = path
-        self.buffer.set_text(text)
-        self.buffer.set_modified(False)
-        self.modified = False
-        self._set_language_from_path(path)
 
     def save(self) -> bool:
         if not self.path:
@@ -485,7 +475,6 @@ class NotepadLinuxWindow(Gtk.ApplicationWindow):
                 self.notebook.set_current_page(self.notebook.page_num(tab))
                 self._refresh_tab_titles()
                 self._sync_encoding_menu_from_current_tab()
-                self._update_status()
             except Exception as exc:
                 self._error_dialog(f"Cannot open file:\n{exc}")
         dialog.destroy()
@@ -496,7 +485,6 @@ class NotepadLinuxWindow(Gtk.ApplicationWindow):
             return
         self._save_tab(tab)
         self._refresh_tab_titles()
-        self._update_status()
 
     def _save_as_current(self) -> None:
         tab = self._current_tab()
@@ -504,7 +492,6 @@ class NotepadLinuxWindow(Gtk.ApplicationWindow):
             return
         self._save_tab_as(tab)
         self._refresh_tab_titles()
-        self._update_status()
 
     def _save_tab(self, tab: EditorTab) -> bool:
         if tab.path:
