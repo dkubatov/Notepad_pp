@@ -388,7 +388,6 @@ class NotepadLinuxWindow(Gtk.ApplicationWindow):
             item.connect("toggled", self._on_encoding_selected, encoding)
             encoding_menu.append(item)
             self.encoding_menu_items[encoding] = item
-        self._sync_encoding_menu_from_current_tab()
 
         self._toggle_dark_theme(dark_item)
         menu_bar.show_all()
@@ -464,8 +463,8 @@ class NotepadLinuxWindow(Gtk.ApplicationWindow):
             title="Open file",
             parent=self,
             action=Gtk.FileChooserAction.OPEN,
-            buttons=("Cancel", Gtk.ResponseType.CANCEL, "Open", Gtk.ResponseType.OK),
         )
+        dialog.add_buttons("Cancel", Gtk.ResponseType.CANCEL, "Open", Gtk.ResponseType.OK)
         response = dialog.run()
         if response == Gtk.ResponseType.OK:
             path = Path(dialog.get_filename())
@@ -509,8 +508,8 @@ class NotepadLinuxWindow(Gtk.ApplicationWindow):
             title="Save file",
             parent=self,
             action=Gtk.FileChooserAction.SAVE,
-            buttons=("Cancel", Gtk.ResponseType.CANCEL, "Save", Gtk.ResponseType.OK),
         )
+        dialog.add_buttons("Cancel", Gtk.ResponseType.CANCEL, "Save", Gtk.ResponseType.OK)
         dialog.set_do_overwrite_confirmation(True)
         if tab.path:
             dialog.set_filename(str(tab.path))

@@ -44,7 +44,7 @@ sudo apt install ./dist/notepadpp-linux_1.0.0_all.deb
 ```
 
 После установки появятся:
-- пункт меню `NotepadPP Linux`;
+- пункт меню `Notepad Light Linux`;
 - иконка приложения (`notepadpp-linux.svg`);
 - файловые ассоциации через `.desktop` (`text/plain`, `json`, `xml`, `markdown`, `python`, `shell`, `c/c++`, `java`);
 - кастомный MIME-тип `application/x-notepadpp-project` для `*.nppproj`.
@@ -55,9 +55,9 @@ sudo apt install ./dist/notepadpp-linux_1.0.0_all.deb
 
 ```ini
 [Desktop Entry]
-Version=1.0
+Version=0.1.0
 Type=Application
-Name=NotepadPP Linux
+Name=Notepad Light Linux
 Exec=python3 /ABSOLUTE/PATH/TO/notepadpp_linux.py
 Icon=accessories-text-editor
 Terminal=false
