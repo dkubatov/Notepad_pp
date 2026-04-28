@@ -7,5 +7,5 @@ Exec=notepadpp-linux %F
 Icon=notepadpp-linux
 Terminal=false
 Categories=Utility;TextEditor;Development;
-MimeType=text/plain;text/markdown;text/x-python;text/x-csrc;text/x-c++src;text/x-java;text/x-shellscript;application/json;application/xml;application/x-notepadpp-project;
+MimeType=text/plain;text/csv;text/markdown;text/html;text/css;text/x-python;text/x-csrc;text/x-c++src;text/x-chdr;text/x-c++hdr;text/x-java;text/x-shellscript;application/javascript;text/javascript;application/typescript;text/typescript;application/json;application/xml;text/xml;application/x-yaml;text/x-yaml;text/x-sql;text/x-go;text/x-rustsrc;application/x-notepadpp-project;
 StartupNotify=true

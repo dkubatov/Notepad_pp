@@ -9,6 +9,73 @@ if command -v update-mime-database >/dev/null 2>&1; then
     update-mime-database /usr/share/mime || true
 fi
 
+python3 - <<'PY' || true
+from pathlib import Path
+
+app = "notepadpp-linux.desktop"
+mime_types = [
+    "text/plain",
+    "text/csv",
+    "text/markdown",
+    "text/html",
+    "text/css",
+    "text/x-python",
+    "text/x-csrc",
+    "text/x-c++src",
+    "text/x-java",
+    "text/x-shellscript",
+    "application/json",
+    "application/xml",
+    "text/xml",
+    "application/x-yaml",
+    "text/x-yaml",
+    "text/x-sql",
+    "text/x-go",
+    "text/x-rustsrc",
+    "application/x-notepadpp-project",
+]
+
+path = Path("/usr/share/applications/mimeapps.list")
+path.parent.mkdir(parents=True, exist_ok=True)
+lines = path.read_text(encoding="utf-8").splitlines(keepends=True) if path.exists() else []
+
+out = []
+in_defaults = False
+saw_defaults = False
+inserted = False
+
+def append_defaults() -> None:
+    global inserted
+    if not inserted:
+        out.extend(f"{mime_type}={app}\n" for mime_type in mime_types)
+        inserted = True
+
+for line in lines:
+    stripped = line.strip()
+    if stripped == "[Default Applications]":
+        saw_defaults = True
+        in_defaults = True
+        out.append(line)
+        continue
+    if stripped.startswith("[") and stripped.endswith("]"):
+        if in_defaults:
+            append_defaults()
+        in_defaults = False
+        out.append(line)
+        continue
+    if in_defaults and any(line.startswith(f"{mime_type}=") for mime_type in mime_types):
+        continue
+    out.append(line)
+
+if not saw_defaults:
+    if out and out[-1].strip():
+        out.append("\n")
+    out.append("[Default Applications]\n")
+
+append_defaults()
+path.write_text("".join(out), encoding="utf-8")
+PY
+
 if command -v gtk-update-icon-cache >/dev/null 2>&1; then
     gtk-update-icon-cache -f /usr/share/icons/hicolor || true
 fi

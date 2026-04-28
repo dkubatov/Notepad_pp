@@ -11,12 +11,22 @@
     <style id="comment" name="Comment" map-to="def:comment"/>
     <style id="string" name="String" map-to="def:string"/>
     <style id="keyword" name="Keyword" map-to="def:keyword"/>
+    <style id="storage" name="Storage" map-to="def:type"/>
+    <style id="modifier" name="Modifier" map-to="def:keyword"/>
+    <style id="operator" name="Operator" map-to="def:operator"/>
+    <style id="variable" name="Variable" map-to="def:identifier"/>
+    <style id="parameter" name="Parameter" map-to="def:identifier"/>
     <style id="number" name="Number" map-to="def:number"/>
     <style id="preprocessor" name="Preprocessor" map-to="def:preprocessor"/>
+    <style id="section" name="Section" map-to="def:preprocessor"/>
     <style id="constant" name="Constant" map-to="def:constant"/>
     <style id="function" name="Builtin Function" map-to="def:builtin"/>
+    <style id="class" name="Class" map-to="def:type"/>
+    <style id="global-variable" name="Global Variable" map-to="def:identifier"/>
+    <style id="enum" name="System Enum" map-to="def:type"/>
     <style id="date-const" name="Date Constant" map-to="def:special-constant"/>
     <style id="annotation" name="Annotation" map-to="def:preprocessor"/>
+    <style id="query" name="Query" map-to="def:keyword"/>
   </styles>
   <definitions>
     <context id="1c-ent" class="no-spell-check">
@@ -26,133 +36,545 @@
         <context ref="string-double"/>
         <context ref="date-constant"/>
         <context ref="number"/>
-        <context ref="constant"/>
-        <context ref="preprocessor-line"/>
-        <context ref="preprocessor-region"/>
+        <context ref="procedure-declaration"/>
+        <context ref="variable-declaration"/>
+        <context ref="assignment-target"/>
+        <context ref="known-directives"/>
         <context ref="annotations"/>
-        <context ref="keywords"/>
-        <context ref="builtin-funcs"/>
+        <context ref="preprocessor-if"/>
+        <context ref="preprocessor-section"/>
+        <context ref="constants-1"/>
+        <context ref="storage-keywords-1"/>
+        <context ref="control-keywords-1"/>
+        <context ref="operators"/>
+        <context ref="builtin-functions-1"/>
+        <context ref="builtin-functions-2"/>
+        <context ref="builtin-functions-3"/>
+
+
+
       </include>
     </context>
+
     <context id="line-comment" style-ref="comment">
       <start>//</start>
       <end>$</end>
     </context>
-    <context id="block-comment" style-ref="comment" end-at-line-end="true">
+
+    <context id="block-comment" style-ref="comment">
       <start>/\*</start>
       <end>\*/</end>
       <include>
         <context ref="block-comment"/>
       </include>
     </context>
-    <context id="string-double" style-ref="string" end-at-line-end="true">
+
+    <context id="string-double" style-ref="string">
       <start>"</start>
-      <end>"</end>
+      <end>"(?!")</end>
+      <include>
+        <context ref="escaped-quote"/>
+        <context ref="query-keywords"/>
+      </include>
     </context>
+
+    <context id="escaped-quote" style-ref="string">
+      <match>""</match>
+    </context>
+
     <context id="date-constant" style-ref="date-const">
-      <match>'[0-9]{4,8}([^']*[0-9]{1,6})?'</match>
+      <match>'(([0-9]{4}[^0-9']*[0-9]{2}[^0-9']*[0-9]{2})([^0-9']*[0-9]{2}[^0-9']*[0-9]{2}([^0-9']*[0-9]{2})?)?)'</match>
     </context>
+
     <context id="number" style-ref="number">
-      <match>[-+]?[0-9]+(\.[0-9]+)?</match>
+      <match>(?&lt;![A-Za-zА-Яа-яЁё0-9_\.])[0-9]+(\.[0-9]+)?(?![A-Za-zА-Яа-яЁё0-9_])</match>
     </context>
-    <context id="constant" style-ref="constant">
-      <keyword>Неопределено</keyword>
+
+    <context id="procedure-declaration">
+      <match>(?i)\b(Процедура|Procedure|Функция|Function)\s+([A-Za-zА-Яа-яЁё0-9_]+)</match>
+      <include>
+        <context id="procedure-kind" sub-pattern="1" style-ref="storage"/>
+        <context id="procedure-name" sub-pattern="2" style-ref="function"/>
+      </include>
+    </context>
+
+    <context id="variable-declaration">
+      <match>(?i)\b(Перем|Var)\s+([A-Za-zА-Яа-яЁё0-9_]+)</match>
+      <include>
+        <context id="var-kind" sub-pattern="1" style-ref="storage"/>
+        <context id="var-name" sub-pattern="2" style-ref="variable"/>
+      </include>
+    </context>
+
+    <context id="assignment-target">
+      <match>(?i)(^|;)\s*([A-Za-zА-Яа-яЁё_][A-Za-zА-Яа-яЁё0-9_]*)\s*(?==)</match>
+      <include>
+        <context id="assignment-name" sub-pattern="2" style-ref="variable"/>
+      </include>
+    </context>
+
+    <context id="known-directives" style-ref="annotation">
+      <match>(?i)&amp;(НаКлиенте((НаСервере(БезКонтекста)?)?)|AtClient((AtServer(NoContext)?)?)|НаСервере(БезКонтекста)?|AtServer(NoContext)?)</match>
+    </context>
+
+    <context id="annotations" style-ref="annotation">
+      <match>(?i)&amp;([A-Za-zА-Яа-яЁё0-9_]+)</match>
+    </context>
+
+    <context id="preprocessor-if" style-ref="preprocessor">
+      <match>(?i)^\s*#(Если|If|ИначеЕсли|ElsIf|Иначе|Else|КонецЕсли|EndIf).*$</match>
+    </context>
+
+    <context id="preprocessor-section" style-ref="section">
+      <match>(?i)^\s*#(Область|Region|КонецОбласти|EndRegion|Удаление|Delete|КонецУдаления|EndDelete|Вставка|Insert|КонецВставки|EndInsert|Использовать|Use|native).*$</match>
+    </context>
+
+    <context id="constants-1" style-ref="constant">
+      <keyword>False</keyword>
+      <keyword>false</keyword>
+      <keyword>NULL</keyword>
+      <keyword>null</keyword>
+      <keyword>True</keyword>
+      <keyword>true</keyword>
+      <keyword>undefined</keyword>
       <keyword>Undefined</keyword>
       <keyword>Истина</keyword>
-      <keyword>True</keyword>
+      <keyword>истина</keyword>
       <keyword>Ложь</keyword>
-      <keyword>False</keyword>
-      <keyword>NULL</keyword>
+      <keyword>ложь</keyword>
+      <keyword>Неопределено</keyword>
+      <keyword>неопределено</keyword>
     </context>
-    <context id="preprocessor-line" style-ref="preprocessor">
-      <keyword>Если</keyword>
-      <keyword>If</keyword>
-      <keyword>ИначеЕсли</keyword>
-      <keyword>ElsIf</keyword>
-      <keyword>Иначе</keyword>
-      <keyword>Else</keyword>
-      <keyword>КонецЕсли</keyword>
-      <keyword>EndIf</keyword>
-      <keyword>Вставка</keyword>
-      <keyword>Insert</keyword>
-      <keyword>КонецВставки</keyword>
-      <keyword>EndInsert</keyword>
-      <keyword>Удаление</keyword>
-      <keyword>Delete</keyword>
-      <keyword>КонецУдаления</keyword>
-      <keyword>EndDelete</keyword>
-      <keyword>Использовать</keyword>
-      <keyword>Use</keyword>
-    </context>
-    <context id="preprocessor-region" style-ref="preprocessor">
-      <keyword>Область</keyword>
-      <keyword>Region</keyword>
-      <keyword>КонецОбласти</keyword>
-      <keyword>EndRegion</keyword>
-    </context>
-    <context id="annotations" style-ref="annotation">
-      <match>(?i)&amp;([a-zа-яё0-9_]+)</match>
-    </context>
-    <context id="keywords" style-ref="keyword">
-      <keyword>Процедура</keyword>
-      <keyword>Procedure</keyword>
-      <keyword>КонецПроцедуры</keyword>
-      <keyword>EndProcedure</keyword>
-      <keyword>Функция</keyword>
-      <keyword>Function</keyword>
-      <keyword>КонецФункции</keyword>
+
+    <context id="storage-keywords-1" style-ref="storage">
       <keyword>EndFunction</keyword>
-      <keyword>Если</keyword>
-      <keyword>If</keyword>
-      <keyword>Тогда</keyword>
-      <keyword>Then</keyword>
-      <keyword>КонецЕсли</keyword>
-      <keyword>EndIf</keyword>
-      <keyword>Пока</keyword>
-      <keyword>While</keyword>
-      <keyword>Цикл</keyword>
-      <keyword>Do</keyword>
-      <keyword>КонецЦикла</keyword>
-      <keyword>EndDo</keyword>
-      <keyword>Для</keyword>
-      <keyword>For</keyword>
-      <keyword>Каждого</keyword>
-      <keyword>Each</keyword>
-      <keyword>Из</keyword>
-      <keyword>In</keyword>
-      <keyword>По</keyword>
-      <keyword>To</keyword>
-      <keyword>Перем</keyword>
-      <keyword>Var</keyword>
-      <keyword>Экспорт</keyword>
+      <keyword>endfunction</keyword>
+      <keyword>EndProcedure</keyword>
+      <keyword>endprocedure</keyword>
       <keyword>Export</keyword>
-      <keyword>Возврат</keyword>
-      <keyword>Return</keyword>
-      <keyword>Знач</keyword>
+      <keyword>export</keyword>
+      <keyword>function</keyword>
+      <keyword>Function</keyword>
+      <keyword>Procedure</keyword>
+      <keyword>procedure</keyword>
+      <keyword>val</keyword>
       <keyword>Val</keyword>
-      <keyword>Попытка</keyword>
-      <keyword>Try</keyword>
-      <keyword>Исключение</keyword>
-      <keyword>Except</keyword>
-      <keyword>КонецПопытки</keyword>
-      <keyword>EndTry</keyword>
-      <keyword>ВызватьИсключение</keyword>
-      <keyword>Raise</keyword>
-      <keyword>Прервать</keyword>
-      <keyword>Break</keyword>
-      <keyword>Продолжить</keyword>
-      <keyword>Continue</keyword>
-      <keyword>Новый</keyword>
-      <keyword>New</keyword>
-      <keyword>И</keyword>
-      <keyword>AND</keyword>
-      <keyword>ИЛИ</keyword>
-      <keyword>OR</keyword>
-      <keyword>НЕ</keyword>
-      <keyword>NOT</keyword>
+      <keyword>Var</keyword>
+      <keyword>var</keyword>
+      <keyword>Знач</keyword>
+      <keyword>знач</keyword>
+      <keyword>КонецПроцедуры</keyword>
+      <keyword>конецпроцедуры</keyword>
+      <keyword>КонецФункции</keyword>
+      <keyword>конецфункции</keyword>
+      <keyword>Перем</keyword>
+      <keyword>перем</keyword>
+      <keyword>Процедура</keyword>
+      <keyword>процедура</keyword>
+      <keyword>функция</keyword>
+      <keyword>Функция</keyword>
+      <keyword>Экспорт</keyword>
+      <keyword>экспорт</keyword>
     </context>
-    <context id="builtin-funcs" style-ref="function">
-      <match>(?i)\b(СтрДлина|StrLen|СокрЛ|TrimL|СокрП|TrimR|СокрЛП|TrimAll|Лев|Left|Прав|Right|Сред|Mid|СтрНайти|StrFind|ВРег|Upper|НРег|Lower|ТРег|Title|Символ|Char|КодСимвола|CharCode|ПустаяСтрока|IsBlankString|СтрЗаменить|StrReplace|СтрЧислоСтрок|StrLineCount|СтрПолучитьСтроку|StrGetLine|СтрРазделить|StrSplit|СтрСоединить|StrConcat|Цел|Int|Окр|Round|Год|Year|Месяц|Month|День|Day|Час|Hour|Минута|Minute|Секунда|Second|НачалоГода|BegOfYear|НачалоДня|BegOfDay|НачалоКвартала|BegOfQuarter|НачалоМесяца|BegOfMonth|КонецГода|EndOfYear|КонецДня|EndOfDay|КонецКвартала|EndOfQuarter|КонецМесяца|EndOfMonth|НеделяГода|WeekOfYear|ДеньГода|DayOfYear|ДеньНедели|WeekDay|ТекущаяДата|CurrentDate|ДобавитьМесяц|AddMonth|Тип|Type|ТипЗнч|TypeOf|Формат|Format|Сообщить|Message|Предупреждение|DoMessageBox|Вопрос|DoQueryBox|Сигнал|Beep|Состояние|Status|ПустоеЗначение|IsEmpty|ЗаполнитьЗначенияСвойств|FillPropertyValues|Min|Max|Мин|Макс)\s*(?=\()</match>
+
+    <context id="control-keywords-1" style-ref="keyword">
+      <keyword>AND</keyword>
+      <keyword>and</keyword>
+      <keyword>Break</keyword>
+      <keyword>break</keyword>
+      <keyword>Continue</keyword>
+      <keyword>continue</keyword>
+      <keyword>Do</keyword>
+      <keyword>do</keyword>
+      <keyword>each</keyword>
+      <keyword>Each</keyword>
+      <keyword>Else</keyword>
+      <keyword>else</keyword>
+      <keyword>elsif</keyword>
+      <keyword>ElsIf</keyword>
+      <keyword>enddo</keyword>
+      <keyword>EndDo</keyword>
+      <keyword>EndFunction</keyword>
+      <keyword>endfunction</keyword>
+      <keyword>endif</keyword>
+      <keyword>EndIf</keyword>
+      <keyword>EndProcedure</keyword>
+      <keyword>endprocedure</keyword>
+      <keyword>endtry</keyword>
+      <keyword>EndTry</keyword>
+      <keyword>Except</keyword>
+      <keyword>except</keyword>
+      <keyword>Export</keyword>
+      <keyword>export</keyword>
+      <keyword>for</keyword>
+      <keyword>For</keyword>
+      <keyword>function</keyword>
+      <keyword>Function</keyword>
+      <keyword>if</keyword>
+      <keyword>If</keyword>
+      <keyword>In</keyword>
+      <keyword>in</keyword>
+      <keyword>NOT</keyword>
+      <keyword>not</keyword>
+      <keyword>OR</keyword>
+      <keyword>or</keyword>
+      <keyword>procedure</keyword>
+      <keyword>Procedure</keyword>
+      <keyword>raise</keyword>
+      <keyword>Raise</keyword>
+      <keyword>return</keyword>
+      <keyword>Return</keyword>
+      <keyword>then</keyword>
+      <keyword>Then</keyword>
+      <keyword>To</keyword>
+      <keyword>to</keyword>
+      <keyword>try</keyword>
+      <keyword>Try</keyword>
+      <keyword>use</keyword>
+      <keyword>Use</keyword>
+      <keyword>Var</keyword>
+      <keyword>var</keyword>
+      <keyword>while</keyword>
+      <keyword>While</keyword>
+      <keyword>Возврат</keyword>
+      <keyword>возврат</keyword>
+      <keyword>ВызватьИсключение</keyword>
+      <keyword>вызватьисключение</keyword>
+      <keyword>для</keyword>
+      <keyword>Для</keyword>
+      <keyword>Если</keyword>
+      <keyword>если</keyword>
+      <keyword>И</keyword>
+      <keyword>и</keyword>
+      <keyword>Из</keyword>
+      <keyword>из</keyword>
+      <keyword>или</keyword>
+      <keyword>ИЛИ</keyword>
+      <keyword>иначе</keyword>
+      <keyword>Иначе</keyword>
+      <keyword>ИначеЕсли</keyword>
+      <keyword>иначеесли</keyword>
+      <keyword>Исключение</keyword>
+      <keyword>исключение</keyword>
+      <keyword>Использовать</keyword>
+      <keyword>использовать</keyword>
+      <keyword>Каждого</keyword>
+      <keyword>каждого</keyword>
+      <keyword>конецесли</keyword>
+      <keyword>КонецЕсли</keyword>
+      <keyword>КонецПопытки</keyword>
+      <keyword>конецпопытки</keyword>
+      <keyword>КонецПроцедуры</keyword>
+      <keyword>конецпроцедуры</keyword>
+      <keyword>КонецФункции</keyword>
+      <keyword>конецфункции</keyword>
+      <keyword>конеццикла</keyword>
+      <keyword>КонецЦикла</keyword>
+      <keyword>НЕ</keyword>
+      <keyword>не</keyword>
+      <keyword>перем</keyword>
+      <keyword>Перем</keyword>
+      <keyword>по</keyword>
+      <keyword>По</keyword>
+      <keyword>пока</keyword>
+      <keyword>Пока</keyword>
+      <keyword>Попытка</keyword>
+      <keyword>попытка</keyword>
+      <keyword>прервать</keyword>
+      <keyword>Прервать</keyword>
+      <keyword>продолжить</keyword>
+      <keyword>Продолжить</keyword>
+      <keyword>процедура</keyword>
+      <keyword>Процедура</keyword>
+      <keyword>Тогда</keyword>
+      <keyword>тогда</keyword>
+      <keyword>функция</keyword>
+      <keyword>Функция</keyword>
+      <keyword>Цикл</keyword>
+      <keyword>цикл</keyword>
+      <keyword>экспорт</keyword>
+      <keyword>Экспорт</keyword>
+    </context>
+
+    <context id="operators" style-ref="operator">
+      <match>(?i)(&lt;=|&gt;=|=|&lt;|&gt;|\+|-|\*|/|%|;|\?|,|\(|\)|\b(НЕ|NOT|И|AND|ИЛИ|OR)\b)</match>
+    </context>
+
+    <context id="builtin-functions-1" style-ref="function">
+      <keyword>ACos</keyword>
+      <keyword>ASin</keyword>
+      <keyword>ATan</keyword>
+      <keyword>Base64Value</keyword>
+      <keyword>Base64Значение</keyword>
+      <keyword>BeginTransaction</keyword>
+      <keyword>CommitTransaction</keyword>
+      <keyword>Cos</keyword>
+      <keyword>Message</keyword>
+      <keyword>NStr</keyword>
+      <keyword>ReadJSON</keyword>
+      <keyword>RollbackTransaction</keyword>
+      <keyword>Sin</keyword>
+      <keyword>Sqrt</keyword>
+      <keyword>Tan</keyword>
+      <keyword>ValueIsFilled</keyword>
+      <keyword>WriteJSON</keyword>
+      <keyword>ЗаписатьJSON</keyword>
+      <keyword>ЗафиксироватьТранзакцию</keyword>
+      <keyword>ЗначениеЗаполнено</keyword>
+      <keyword>НачатьТранзакцию</keyword>
+      <keyword>НСтр</keyword>
+      <keyword>ОтменитьТранзакцию</keyword>
+      <keyword>ПрочитатьJSON</keyword>
+      <keyword>Сообщить</keyword>
+      <keyword>AccessParameters</keyword>
+      <keyword>AccessRight</keyword>
+      <keyword>ActiveWindow</keyword>
+      <keyword>AddMonth</keyword>
+      <keyword>ApplicationPresentation</keyword>
+      <keyword>AttachAddIn</keyword>
+      <keyword>AttachAddInAsync</keyword>
+      <keyword>AttachComputerInformationExtensionAsync</keyword>
+      <keyword>AttachCryptoExtension</keyword>
+      <keyword>AttachCryptoExtensionAsync</keyword>
+      <keyword>AttachFileSystemExtension</keyword>
+      <keyword>AttachFileSystemExtensionAsync</keyword>
+      <keyword>AttachIdleHandler</keyword>
+      <keyword>AttachLicensingClientParametersRequestHandler</keyword>
+      <keyword>AttachNotificationHandler</keyword>
+      <keyword>Base64String</keyword>
+      <keyword>Base64Строка</keyword>
+      <keyword>Beep</keyword>
+      <keyword>BeginAttachingAddIn</keyword>
+      <keyword>BeginAttachingComputerInformationExtension</keyword>
+      <keyword>BeginAttachingCryptoExtension</keyword>
+      <keyword>BeginAttachingFileSystemExtension</keyword>
+      <keyword>BeginCopyingFile</keyword>
+      <keyword>BeginCreateBinaryDataFromFile</keyword>
+      <keyword>BeginCreatingDirectory</keyword>
+      <keyword>BeginDeletingFiles</keyword>
+      <keyword>BeginFindingFiles</keyword>
+      <keyword>BeginGetFileFromServer</keyword>
+      <keyword>BeginGetFilesFromServer</keyword>
+      <keyword>BeginGettingDocumentsDir</keyword>
+      <keyword>BeginGettingFiles</keyword>
+      <keyword>BeginGettingMobileDeviceLibraryDir</keyword>
+      <keyword>BeginGettingNetworkAdaptersInformation</keyword>
+      <keyword>BeginGettingTempFilesDir</keyword>
+      <keyword>BeginGettingUserDataWorkDir</keyword>
+      <keyword>BeginInstallAddIn</keyword>
+      <keyword>BeginInstallCryptoExtension</keyword>
+      <keyword>BeginInstallFileSystemExtension</keyword>
+      <keyword>BeginInstallingComputerInformationExtension</keyword>
+      <keyword>BeginMovingFile</keyword>
+      <keyword>BeginPutFile</keyword>
+      <keyword>BeginPutFilesToServer</keyword>
+      <keyword>BeginPutFileToServer</keyword>
+      <keyword>BeginPuttingFiles</keyword>
+      <keyword>BeginRequestingUserPermission</keyword>
+      <keyword>BeginRunningApplication</keyword>
+      <keyword>BegOfDay</keyword>
+      <keyword>BegOfHour</keyword>
+      <keyword>BegOfMinute</keyword>
+      <keyword>BegOfMonth</keyword>
+      <keyword>BegOfQuarter</keyword>
+      <keyword>BegOfWeek</keyword>
+      <keyword>BegOfYear</keyword>
+      <keyword>BinDir</keyword>
+      <keyword>BitwiseAnd</keyword>
+      <keyword>BitwiseAndNot</keyword>
+      <keyword>BitwiseNot</keyword>
+      <keyword>BitwiseOr</keyword>
+      <keyword>BitwiseShiftLeft</keyword>
+      <keyword>BitwiseShiftRight</keyword>
+      <keyword>BitwiseXor</keyword>
+      <keyword>Boolean</keyword>
+      <keyword>BriefErrorDescription</keyword>
+      <keyword>CannotOpenForm</keyword>
+      <keyword>CanReadXML</keyword>
+    </context>
+    <context id="builtin-functions-2" style-ref="function">
+      <keyword>Char</keyword>
+      <keyword>CharCode</keyword>
+      <keyword>CheckBit</keyword>
+      <keyword>CheckByBitMask</keyword>
+      <keyword>CheckScriptCircularRefs</keyword>
+      <keyword>ClearEventLog</keyword>
+      <keyword>ClearMessages</keyword>
+      <keyword>ClearUserSettings</keyword>
+      <keyword>CloseHelp</keyword>
+      <keyword>ComputerName</keyword>
+      <keyword>ConcatBinaryData</keyword>
+      <keyword>ConcatBinaryDataBuffers</keyword>
+      <keyword>ConfigurationChanged</keyword>
+      <keyword>ConnectExternalDataSource</keyword>
+      <keyword>ConnectionStopRequest</keyword>
+      <keyword>CopyEventLog</keyword>
+      <keyword>CopyFileAsync</keyword>
+      <keyword>CopyFormData</keyword>
+      <keyword>CreateBinaryDataFromFileAsync</keyword>
+      <keyword>CreateDirectory</keyword>
+      <keyword>CreateDirectoryAsync</keyword>
+      <keyword>CreateXDTOFactory</keyword>
+      <keyword>CurrentDate</keyword>
+      <keyword>CurrentLanguage</keyword>
+      <keyword>CurrentLocaleCode</keyword>
+      <keyword>CurrentRunMode</keyword>
+      <keyword>CurrentSessionDate</keyword>
+      <keyword>CurrentSystemLanguage</keyword>
+      <keyword>CurrentUniversalDate</keyword>
+      <keyword>CurrentUniversalDateInMilliseconds</keyword>
+      <keyword>DataBaseConfigurationChangedDynamically</keyword>
+      <keyword>DataSeparationSafeMode</keyword>
+      <keyword>Date</keyword>
+      <keyword>Day</keyword>
+      <keyword>DaylightTimeOffset</keyword>
+      <keyword>DayOfYear</keyword>
+      <keyword>DecodeString</keyword>
+      <keyword>DeleteFiles</keyword>
+      <keyword>DeleteFilesAsync</keyword>
+      <keyword>DeleteFromTempStorage</keyword>
+      <keyword>DeleteObjects</keyword>
+      <keyword>DetachIdleHandler</keyword>
+      <keyword>DetachLicensingClientParametersRequestHandler</keyword>
+      <keyword>DetachNotificationHandler</keyword>
+      <keyword>DetailErrorDescription</keyword>
+      <keyword>DisconnectExternalDataSource</keyword>
+      <keyword>DocumentsDir</keyword>
+      <keyword>DocumentsDirAsync</keyword>
+      <keyword>DoMessageBox</keyword>
+      <keyword>DoMessageBoxAsync</keyword>
+      <keyword>DoQueryBox</keyword>
+      <keyword>DoQueryBoxAsync</keyword>
+      <keyword>DynamicAddInInstallationSupported</keyword>
+      <keyword>EncodeString</keyword>
+      <keyword>EndOfDay</keyword>
+      <keyword>EndOfHour</keyword>
+      <keyword>EndOfMinute</keyword>
+      <keyword>EndOfMonth</keyword>
+      <keyword>EndOfQuarter</keyword>
+      <keyword>EndOfWeek</keyword>
+      <keyword>EndOfYear</keyword>
+      <keyword>EraseInfoBaseData</keyword>
+      <keyword>ErrorDescription</keyword>
+      <keyword>ErrorInfo</keyword>
+      <keyword>Eval</keyword>
+      <keyword>EventLogEventPresentation</keyword>
+      <keyword>ExclusiveMode</keyword>
+      <keyword>ExecuteNotifyProcessing</keyword>
+      <keyword>Exit</keyword>
+      <keyword>Exp</keyword>
+      <keyword>FileCopy</keyword>
+      <keyword>FillPropertyValues</keyword>
+      <keyword>Find</keyword>
+      <keyword>FindByRef</keyword>
+      <keyword>FindDisallowedXMLCharacters</keyword>
+      <keyword>FindFiles</keyword>
+      <keyword>FindFilesAsync</keyword>
+      <keyword>FindMarkedForDeletion</keyword>
+      <keyword>FindWindowByURL</keyword>
+      <keyword>Format</keyword>
+      <keyword>FormDataToValue</keyword>
+      <keyword>FromXMLType</keyword>
+      <keyword>GetAddressByLocation</keyword>
+      <keyword>GetAllFilesMask</keyword>
+      <keyword>GetAppearanceTemplate</keyword>
+      <keyword>GetAvailableLocaleCodes</keyword>
+      <keyword>GetAvailableTimeZones</keyword>
+      <keyword>GetBase64BinaryDataBufferFromBinaryDataBuffer</keyword>
+      <keyword>GetBase64BinaryDataFromBinaryData</keyword>
+      <keyword>GetBase64StringFromBinaryData</keyword>
+    </context>
+    <context id="builtin-functions-3" style-ref="function">
+      <keyword>GetBase64StringFromBinaryDataBuffer</keyword>
+      <keyword>GetBinaryDataBufferFromBase64BinaryDataBuffer</keyword>
+      <keyword>GetBinaryDataBufferFromBase64String</keyword>
+      <keyword>GetBinaryDataBufferFromBinaryData</keyword>
+      <keyword>GetBinaryDataBufferFromHexBinaryDataBuffer</keyword>
+      <keyword>GetBinaryDataBufferFromHexString</keyword>
+      <keyword>GetBinaryDataBufferFromString</keyword>
+      <keyword>GetBinaryDataFromBase64BinaryData</keyword>
+      <keyword>GetBinaryDataFromBase64String</keyword>
+      <keyword>GetBinaryDataFromBinaryDataBuffer</keyword>
+      <keyword>GetBinaryDataFromHexBinaryData</keyword>
+      <keyword>GetBinaryDataFromHexString</keyword>
+      <keyword>GetBinaryDataFromString</keyword>
+      <keyword>GetChoiceData</keyword>
+      <keyword>GetClientAllFilesMask</keyword>
+      <keyword>GetClientConnectionSpeed</keyword>
+      <keyword>GetClientDisplaysInformation</keyword>
+      <keyword>GetClientPathSeparator</keyword>
+      <keyword>GetCommonForm</keyword>
+      <keyword>GetCommonTemplate</keyword>
+      <keyword>GetCOMObject</keyword>
+      <keyword>GetComputerSleepModeProhibition</keyword>
+      <keyword>GetConfigurationID</keyword>
+      <keyword>GetCurrentInfoBaseSession</keyword>
+      <keyword>GetDataBaseConfigurationUpdate</keyword>
+      <keyword>GetDatabaseDataSize</keyword>
+      <keyword>GetDBStorageStructureInfo</keyword>
+      <keyword>GetEventLogEventUse</keyword>
+      <keyword>GetEventLogFilterValues</keyword>
+      <keyword>GetEventLogUsing</keyword>
+      <keyword>GetExclusiveModeParameters</keyword>
+      <keyword>GetExternalResourcesMode</keyword>
+      <keyword>GetExternalURL</keyword>
+      <keyword>GetFile</keyword>
+      <keyword>GetFileFromServerAsync</keyword>
+      <keyword>GetFiles</keyword>
+      <keyword>GetFilesFromServerAsync</keyword>
+      <keyword>GetForm</keyword>
+      <keyword>GetFromTempStorage</keyword>
+      <keyword>GetFunctionalOption</keyword>
+      <keyword>GetHexBinaryDataBufferFromBinaryDataBuffer</keyword>
+      <keyword>GetHexBinaryDataFromBinaryData</keyword>
+      <keyword>GetHexStringFromBinaryData</keyword>
+      <keyword>GetHexStringFromBinaryDataBuffer</keyword>
+      <keyword>GetHibernateSessionTerminateTime</keyword>
+      <keyword>GetInfoBaseBeginningOfCentury</keyword>
+      <keyword>GetInfoBaseConnections</keyword>
+      <keyword>GetInfoBasePredefinedData</keyword>
+      <keyword>GetInfoBaseSessions</keyword>
+      <keyword>GetInfoBaseTimeZone</keyword>
+      <keyword>GetInfoBaseURL</keyword>
+      <keyword>GetInterfaceFunctionalOption</keyword>
+      <keyword>GetInterfaceFunctionalOptionParameters</keyword>
+      <keyword>GetLicensingClientAdditionalParameter</keyword>
+      <keyword>GetLicensingClientName</keyword>
+      <keyword>GetLocationByAddress</keyword>
+      <keyword>GetLockWaitTime</keyword>
+      <keyword>GetNetworkAdaptersInformationAsync</keyword>
+      <keyword>GetObjectAndFormAttributeConformity</keyword>
+      <keyword>GetObjectAndFormConformity</keyword>
+      <keyword>GetPassiveSessionHibernateTime</keyword>
+      <keyword>GetPathSeparator</keyword>
+      <keyword>GetPredefinedValueFullName</keyword>
+      <keyword>GetPreferableMainServerUse</keyword>
+      <keyword>GetRealTimeTimestamp</keyword>
+      <keyword>GetSafeModeDisabled</keyword>
+      <keyword>GetServerAllFilesMask</keyword>
+      <keyword>GetServerPathSeparator</keyword>
+      <keyword>GetSessionsLock</keyword>
+      <keyword>GetStandardODataInterfaceContent</keyword>
+      <keyword>GetStringDeclensions</keyword>
+      <keyword>GetStringDeclensionsByNumber</keyword>
+      <keyword>GetStringFromBinaryData</keyword>
+      <keyword>GetStringFromBinaryDataBuffer</keyword>
+      <keyword>GetTempFileName</keyword>
+      <keyword>GetTotalRecalcJobCount</keyword>
+      <keyword>GetURL</keyword>
+      <keyword>GetURLsPresentations</keyword>
+      <keyword>GetUsedServer</keyword>
+      <keyword>GetUserMessages</keyword>
+    </context>
+
+
+
+
+
+
+
+    <context id="query-keywords" style-ref="query">
+      <match>(?i)\b(ВЫБРАТЬ|ВЫБРАТЬ\s+РАЗРЕШЕННЫЕ|Select|ИЗ|From|ГДЕ|Where|КАК|As|ИТОГИ|Totals|ПО|By|СГРУППИРОВАТЬ|Group|УПОРЯДОЧИТЬ|Order|ОБЪЕДИНИТЬ|Union|ПЕРВЫЕ|Top|РАЗЛИЧНЫЕ|Distinct|ЛЕВОЕ|Left|ПРАВОЕ|Right|ВНУТРЕННЕЕ|Inner|СОЕДИНЕНИЕ|Join)\b</match>
     </context>
   </definitions>
 </language>

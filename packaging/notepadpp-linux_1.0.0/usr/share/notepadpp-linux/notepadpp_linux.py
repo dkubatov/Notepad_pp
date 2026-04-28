@@ -390,6 +390,7 @@ class NotepadLinuxWindow(Gtk.ApplicationWindow):
             self.encoding_menu_items[encoding] = item
 
         self._toggle_dark_theme(dark_item)
+        menu_bar.show_all()
         return menu_bar
 
     def _append_menu_item(self, menu: Gtk.Menu, label: str, callback, accel: str) -> None:
@@ -457,6 +458,23 @@ class NotepadLinuxWindow(Gtk.ApplicationWindow):
                 continue
         return path.read_text(encoding="utf-8", errors="replace"), "utf-8"
 
+    def open_file(self, path: Path) -> None:
+        content, encoding = self._read_file_with_detected_encoding(path)
+        tab = EditorTab(path=path, content=content, encoding=encoding)
+        self._add_tab(tab)
+        self.notebook.set_current_page(self.notebook.page_num(tab))
+        self._refresh_tab_titles()
+        self._sync_encoding_menu_from_current_tab()
+        self._update_status()
+
+    def open_files(self, paths: list[Path]) -> None:
+        for path in paths:
+            try:
+                self.open_file(path)
+            except Exception as exc:
+                self._error_dialog(f"Cannot open file '{path}':\n{exc}")
+        self.present()
+
     def _open_file_dialog(self) -> None:
         dialog = Gtk.FileChooserDialog(
             title="Open file",
@@ -467,15 +485,7 @@ class NotepadLinuxWindow(Gtk.ApplicationWindow):
         response = dialog.run()
         if response == Gtk.ResponseType.OK:
             path = Path(dialog.get_filename())
-            try:
-                content, encoding = self._read_file_with_detected_encoding(path)
-                tab = EditorTab(path=path, content=content, encoding=encoding)
-                self._add_tab(tab)
-                self.notebook.set_current_page(self.notebook.page_num(tab))
-                self._refresh_tab_titles()
-                self._sync_encoding_menu_from_current_tab()
-            except Exception as exc:
-                self._error_dialog(f"Cannot open file:\n{exc}")
+            self.open_files([path])
         dialog.destroy()
 
     def _save_current(self) -> None:
@@ -777,7 +787,10 @@ class NotepadLinuxWindow(Gtk.ApplicationWindow):
 
 class NotepadLinuxApp(Gtk.Application):
     def __init__(self) -> None:
-        super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.FLAGS_NONE)
+        super().__init__(
+            application_id=APP_ID,
+            flags=Gio.ApplicationFlags.HANDLES_OPEN,
+        )
 
     def do_activate(self) -> None:
         window = self.props.active_window
@@ -785,11 +798,27 @@ class NotepadLinuxApp(Gtk.Application):
             window = NotepadLinuxWindow(self)
         window.present()
 
+    def do_open(self, files: list[Gio.File], _n_files: int, _hint: str) -> None:
+        window = self.props.active_window
+        if not window:
+            window = NotepadLinuxWindow(self)
+
+        paths = []
+        for file in files:
+            path = file.get_path()
+            if path:
+                paths.append(Path(path))
+
+        if isinstance(window, NotepadLinuxWindow):
+            window.open_files(paths)
+        else:
+            window.present()
+
 
 def main() -> None:
     _install_warning_filters()
     app = NotepadLinuxApp()
-    app.run(None)
+    app.run(sys.argv)
 
 
 if __name__ == "__main__":

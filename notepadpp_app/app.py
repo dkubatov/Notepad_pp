@@ -1,12 +1,8 @@
-#!/usr/bin/env python3
-"""
-Notepad light - a lightweight Notepad++-style editor for Debian/Ubuntu.
-"""
+"""GTK application implementation for Notepad Light."""
 
 from __future__ import annotations
 
 import json
-import os
 import re
 import sys
 import webbrowser
@@ -21,110 +17,70 @@ gi.require_version("GtkSource", "3.0")
 
 from gi.repository import Gdk, Gio, GLib, Gtk, GtkSource, Pango
 
+from .config import (
+    APP_ID,
+    CONFIG_DIR,
+    ENCODINGS,
+    ICON_PATH,
+    LANG_EXTENSIONS,
+    LANG_EXT_TO_EXTENSION,
+    LANG_LABELS,
+    LANGUAGE_MENU_ITEMS,
+    SCRIPT_DIR,
+    SESSION_FILE,
+    SETTINGS_FILE,
+)
 
-APP_ID = "org.notepadpp.linux"
-
-SCRIPT_DIR = Path(__file__).resolve().parent
-ICON_PATH = str(SCRIPT_DIR / "icon" / "notepadpp_icon_256_transparent.png")
-
-CONFIG_DIR = Path.home() / ".config" / "notepadpp-linux"
-SESSION_FILE = CONFIG_DIR / "session.json"
-SETTINGS_FILE = CONFIG_DIR / "settings.json"
 URL_PATTERN = re.compile(r"(https?://[^\s<>\"]+)")
-ENCODINGS = [
-    ("utf-8", "UTF-8"),
-    ("utf-16", "UTF-16"),
-    ("cp1251", "Windows-1251"),
-    ("cp1252", "Windows-1252"),
-    ("cp866", "DOS CP866"),
-    ("koi8-r", "KOI8-R (Linux)"),
-    ("iso-8859-1", "ISO-8859-1 (Latin-1)"),
-]
+EDITOR_THEME_PROVIDER = Gtk.CssProvider()
 
 
-LANG_EXTENSIONS: dict[str, str] = {
-    ".txt": "text",
-    ".csv": "csv",
-    ".md": "markdown",
-    ".xml": "xml",
-    ".json": "json",
-    ".os": "1c-ent",
-    ".py": "python",
-    ".js": "javascript",
-    ".ts": "typescript",
-    ".html": "html",
-    ".css": "css",
-    ".c": "c",
-    ".cpp": "cpp",
-    ".h": "cpphdr",
-    ".java": "java",
-    ".sh": "sh",
-    ".yaml": "yaml",
-    ".yml": "yaml",
-    ".sql": "sql",
-    ".go": "go",
-    ".rs": "rust",
-}
+def _read_text_for_display(path: Path, encoding: str) -> str:
+    data = path.read_bytes()
+    try:
+        return data.decode(encoding)
+    except UnicodeError:
+        return data.decode(encoding, errors="replace")
 
-# Mapping from GtkSource language id to display label
-LANG_LABELS: dict[str, str] = {
-    "text": "Plain Text",
-    "csv": "CSV",
-    "markdown": "Markdown",
-    "xml": "XML",
-    "json": "JSON",
-    "1c-ent": "1C Enterprise",
-    "python": "Python",
-    "javascript": "JavaScript",
-    "typescript": "TypeScript",
-    "html": "HTML",
-    "css": "CSS",
-    "c": "C",
-    "cpp": "C++",
-    "cpphdr": "C/C++ Header",
-    "java": "Java",
-    "sh": "Shell",
-    "yaml": "YAML",
-    "sql": "SQL",
-    "go": "Go",
-    "rust": "Rust",
-}
 
-# All language IDs supported in the Syntax Highlight menu (ordered as displayed)
-LANGUAGE_MENU_ITEMS: list[tuple[str, str]] = [
-    ("Plain Text", "text"),
-    ("CSV", "csv"),
-    ("Markdown", "markdown"),
-    ("XML", "xml"),
-    ("JSON", "json"),
-    ("1C Enterprise", "1c-ent"),
-    ("Python", "python"),
-    ("JavaScript", "javascript"),
-    ("TypeScript", "typescript"),
-    ("HTML", "html"),
-    ("CSS", "css"),
-    ("C", "c"),
-    ("C++", "cpp"),
-    ("C/C++ Header", "cpphdr"),
-    ("Java", "java"),
-    ("Shell", "sh"),
-    ("YAML", "yaml"),
-    ("SQL", "sql"),
-    ("Go", "go"),
-    ("Rust", "rust"),
-]
-
-LANG_EXT_TO_EXTENSION: dict[str, str] = {v: k for k, v in LANG_EXTENSIONS.items()}
-# Ensure every language ID used in the menu has an extension mapping
-LANG_EXT_TO_EXTENSION.update({lang_id: f".{lang_id}" for lang_id in dict(LANGUAGE_MENU_ITEMS).values() if lang_id not in LANG_EXT_TO_EXTENSION})
-LANG_EXT_TO_EXTENSION.update({
-    "text": ".txt",
-    "1c-ent": ".os",
-    "cpphdr": ".h",
-    "javascript": ".js",
-    "typescript": ".ts",
-    "markdown": ".md",
-})
+def _apply_editor_theme_css(dark: bool) -> None:
+    css = (
+        b"""
+        textview.notepad-editor,
+        textview.notepad-editor text {
+            background-color: #1e1e1e;
+            color: #d4d4d4;
+            caret-color: #ffffff;
+            font: 11pt Monospace;
+        }
+        textview.notepad-editor selection {
+            background-color: #264f78;
+            color: #ffffff;
+        }
+        """
+        if dark
+        else b"""
+        textview.notepad-editor,
+        textview.notepad-editor text {
+            background-color: #ffffff;
+            color: #202124;
+            caret-color: #000000;
+            font: 11pt Monospace;
+        }
+        textview.notepad-editor selection {
+            background-color: #b7d7ff;
+            color: #000000;
+        }
+        """
+    )
+    EDITOR_THEME_PROVIDER.load_from_data(css)
+    screen = Gdk.Screen.get_default()
+    if screen:
+        Gtk.StyleContext.add_provider_for_screen(
+            screen,
+            EDITOR_THEME_PROVIDER,
+            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
+        )
 
 
 def _install_warning_filters() -> None:
@@ -176,10 +132,10 @@ class EditorTab(Gtk.Box):
     ) -> None:
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         self.path = path
-        self.modified = False
         self.search_mark = None
         self.encoding = encoding
         self._language_id = language_id
+        self._link_refresh_source_id = 0
 
         self.buffer = GtkSource.Buffer()
         self.buffer.set_highlight_syntax(True)
@@ -196,11 +152,7 @@ class EditorTab(Gtk.Box):
         self.view.set_monospace(True)
         self.view.set_tab_width(4)
         self.view.set_insert_spaces_instead_of_tabs(True)
-        provider = Gtk.CssProvider()
-        provider.load_from_data(b"textview { font: 11pt Monospace; }")
-        self.view.get_style_context().add_provider(
-            provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
-        )
+        self.view.get_style_context().add_class("notepad-editor")
         self.view.add_events(
             Gdk.EventMask.POINTER_MOTION_MASK | Gdk.EventMask.LEAVE_NOTIFY_MASK
         )
@@ -214,7 +166,6 @@ class EditorTab(Gtk.Box):
 
         self.buffer.set_text(content)
         self.buffer.set_modified(False)
-        self.modified = False
 
         if self.path:
             self._language_id = LANG_EXTENSIONS.get(self.path.suffix.lower(), "text")
@@ -226,9 +177,22 @@ class EditorTab(Gtk.Box):
 
         self.show_all()
 
+    @property
+    def modified(self) -> bool:
+        return self.buffer.get_modified()
+
     def _on_buffer_changed(self, _buffer: GtkSource.Buffer) -> None:
-        self.modified = True
+        self._schedule_link_refresh()
+
+    def _schedule_link_refresh(self) -> None:
+        if self._link_refresh_source_id:
+            GLib.source_remove(self._link_refresh_source_id)
+        self._link_refresh_source_id = GLib.timeout_add(200, self._refresh_links_debounced)
+
+    def _refresh_links_debounced(self) -> bool:
+        self._link_refresh_source_id = 0
         self._refresh_links()
+        return False
 
     def _refresh_links(self) -> None:
         start, end = self.buffer.get_bounds()
@@ -329,8 +293,7 @@ class EditorTab(Gtk.Box):
         """Register the custom languages/ directory so GtkSource can find .lang files."""
         lang_manager = GtkSource.LanguageManager.get_default()
         existing = list(lang_manager.get_search_path())
-        script_dir = Path(__file__).resolve().parent
-        langs_dir = str(script_dir / "languages")
+        langs_dir = str(SCRIPT_DIR / "languages")
         if langs_dir not in existing:
             existing.insert(0, langs_dir)
             lang_manager.set_search_path(existing)
@@ -356,12 +319,23 @@ class EditorTab(Gtk.Box):
             self.buffer.set_language(None)
 
     def load_file(self, path: Path) -> None:
-        text = path.read_text(encoding=self.encoding)
+        text = _read_text_for_display(path, self.encoding)
         self.path = path
         self.buffer.set_text(text)
         self.buffer.set_modified(False)
-        self.modified = False
         self._set_language_from_path(path)
+
+    def reload_with_encoding(self, encoding: str) -> None:
+        if not self.path:
+            self.set_encoding(encoding)
+            return
+        text = _read_text_for_display(self.path, encoding)
+        self.encoding = encoding
+        self.buffer.set_text(text)
+        self.buffer.set_modified(False)
+        self._set_language_from_path(self.path)
+        self._apply_style_scheme()
+        self._refresh_links()
 
     def save(self) -> bool:
         if not self.path:
@@ -370,7 +344,6 @@ class EditorTab(Gtk.Box):
         text = self.buffer.get_text(start, end, True)
         self.path.write_text(text, encoding=self.encoding)
         self.buffer.set_modified(False)
-        self.modified = False
         return True
 
     def save_as(self, path: Path) -> bool:
@@ -382,7 +355,6 @@ class EditorTab(Gtk.Box):
         if self.encoding == encoding:
             return
         self.encoding = encoding
-        self.modified = True
         self.buffer.set_modified(True)
 
     def get_title(self) -> str:
@@ -457,8 +429,11 @@ class NotepadLinuxWindow(Gtk.ApplicationWindow):
         self.find_dialog: Optional[FindReplaceDialog] = None
         self._updating_encoding_menu = False
         self.encoding_menu_items: dict[str, Gtk.RadioMenuItem] = {}
+        self.encoding_menu_handlers: dict[str, int] = {}
         self._updating_language_menu = False
         self.language_menu_items: dict[str, Gtk.RadioMenuItem] = {}
+        self.language_menu_handlers: dict[str, int] = {}
+        self._ui_sync_source_id = 0
         self.status = Gtk.Statusbar()
         self.status_ctx = self.status.get_context_id("cursor")
 
@@ -467,20 +442,24 @@ class NotepadLinuxWindow(Gtk.ApplicationWindow):
 
         root.pack_start(self._build_menu_bar(), False, False, 0)
 
+        tab_controls = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+
+        self.new_tab_btn = Gtk.Button(label="+")
+        self.new_tab_btn.set_relief(Gtk.ReliefStyle.NONE)
+        self.new_tab_btn.set_tooltip_text("New tab")
+        self.new_tab_btn.set_focus_on_click(False)
+        self.new_tab_btn.connect("clicked", lambda *_: self._new_tab())
+        tab_controls.pack_end(self.new_tab_btn, False, False, 0)
+        root.pack_start(tab_controls, False, False, 0)
+
         self.notebook = Gtk.Notebook()
         self.notebook.set_scrollable(True)
         self.notebook.connect("switch-page", self._on_switch_page)
-        new_tab_btn = Gtk.Button(label="+")
-        new_tab_btn.set_relief(Gtk.ReliefStyle.NONE)
-        new_tab_btn.set_tooltip_text("New tab")
-        new_tab_btn.connect("clicked", lambda *_: self._new_tab())
-        self.notebook.set_action_widget(new_tab_btn, Gtk.PackType.END)
-        new_tab_btn.show()
         root.pack_start(self.notebook, True, True, 0)
         root.pack_start(self.status, False, False, 0)
 
-        self._new_tab()
-        self._load_session()
+        if not self._load_session():
+            self._new_tab()
         # Apply saved wrap mode to all tabs
         if hasattr(self, "_wrap_item") and self._wrap_item.get_active():
             for i in range(self.notebook.get_n_pages()):
@@ -507,7 +486,7 @@ class NotepadLinuxWindow(Gtk.ApplicationWindow):
                 "word_wrap": self._wrap_item.get_active() if hasattr(self, "_wrap_item") else False,
                 "dark_theme": self._dark_item.get_active() if hasattr(self, "_dark_item") else True,
             }
-            SETTINGS_FILE.write_text(json.dumps(payload), encoding="utf-8")
+            self._write_json_atomic(SETTINGS_FILE, payload)
         except Exception:
             pass
 
@@ -572,9 +551,10 @@ class NotepadLinuxWindow(Gtk.ApplicationWindow):
                 group = item
             else:
                 item = Gtk.RadioMenuItem.new_with_label_from_widget(group, label)
-            item.connect("toggled", self._on_encoding_selected, encoding)
+            handler_id = item.connect("toggled", self._on_encoding_selected, encoding)
             encoding_menu.append(item)
             self.encoding_menu_items[encoding] = item
+            self.encoding_menu_handlers[encoding] = handler_id
 
         lang_group: Optional[Gtk.RadioMenuItem] = None
         for label, lang_id in LANGUAGE_MENU_ITEMS:
@@ -583,9 +563,10 @@ class NotepadLinuxWindow(Gtk.ApplicationWindow):
                 lang_group = item
             else:
                 item = Gtk.RadioMenuItem.new_with_label_from_widget(lang_group, label)
-            item.connect("toggled", self._on_language_selected, lang_id)
+            handler_id = item.connect("toggled", self._on_language_selected, lang_id)
             syntax_menu.append(item)
             self.language_menu_items[lang_id] = item
+            self.language_menu_handlers[lang_id] = handler_id
 
         self._toggle_dark_theme(dark_item)
         return menu_bar
@@ -611,6 +592,25 @@ class NotepadLinuxWindow(Gtk.ApplicationWindow):
         widget = self.notebook.get_nth_page(idx)
         return widget if isinstance(widget, EditorTab) else None
 
+    def _iter_tabs(self):
+        for i in range(self.notebook.get_n_pages()):
+            tab = self.notebook.get_nth_page(i)
+            if isinstance(tab, EditorTab):
+                yield tab
+
+    def _resolve_path(self, path: Path) -> Path:
+        try:
+            return path.expanduser().resolve()
+        except OSError:
+            return path.expanduser().absolute()
+
+    def _find_tab_by_path(self, path: Path) -> Optional[EditorTab]:
+        resolved = self._resolve_path(path)
+        for tab in self._iter_tabs():
+            if tab.path and self._resolve_path(tab.path) == resolved:
+                return tab
+        return None
+
     def _add_tab(self, tab: EditorTab) -> None:
         tab.view.connect("move-cursor", lambda *_: self._update_status())
         tab.view.connect("button-release-event", lambda *_: self._update_status() or False)
@@ -620,18 +620,41 @@ class NotepadLinuxWindow(Gtk.ApplicationWindow):
         self.notebook.append_page(tab, header)
         self.notebook.set_tab_reorderable(tab, True)
         self.notebook.set_tab_detachable(tab, False)
+        tab.show_all()
+        header.show_all()
 
     def _build_tab_header(self, tab: EditorTab) -> Gtk.Box:
         box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        title_click_area = Gtk.EventBox()
+        title_click_area.set_visible_window(False)
+        title_click_area.add_events(Gdk.EventMask.BUTTON_PRESS_MASK)
+        title_click_area.connect("button-press-event", self._on_tab_header_click, tab)
         title = Gtk.Label(label=tab.get_title())
+        title.set_xalign(0.0)
+        title_click_area.add(title)
         close_btn = Gtk.Button.new_from_icon_name("window-close", Gtk.IconSize.MENU)
         close_btn.set_relief(Gtk.ReliefStyle.NONE)
         close_btn.set_focus_on_click(False)
         close_btn.connect("clicked", lambda *_: self._close_tab(tab))
-        box.pack_start(title, False, False, 0)
+        box.pack_start(title_click_area, True, True, 0)
         box.pack_start(close_btn, False, False, 0)
         box.show_all()
         return box
+
+    def _on_tab_header_click(
+        self,
+        _widget: Gtk.Widget,
+        event: Gdk.EventButton,
+        tab: EditorTab,
+    ) -> bool:
+        if event.button != 1:
+            return False
+        page = self.notebook.page_num(tab)
+        if page >= 0:
+            self.notebook.set_current_page(page)
+            self._schedule_current_tab_ui_sync()
+            return True
+        return False
 
     def _new_tab(self) -> None:
         tab = EditorTab()
@@ -656,6 +679,14 @@ class NotepadLinuxWindow(Gtk.ApplicationWindow):
         return path.read_text(encoding="utf-8", errors="replace"), "utf-8"
 
     def open_file(self, path: Path) -> None:
+        path = self._resolve_path(path)
+        existing = self._find_tab_by_path(path)
+        if existing:
+            self.notebook.set_current_page(self.notebook.page_num(existing))
+            self._sync_encoding_menu_from_current_tab()
+            self._sync_language_menu_from_current_tab()
+            self._update_status()
+            return
         content, encoding = self._read_file_with_detected_encoding(path)
         tab = EditorTab(path=path, content=content, encoding=encoding)
         self._add_tab(tab)
@@ -741,10 +772,9 @@ class NotepadLinuxWindow(Gtk.ApplicationWindow):
         lang_filters: list[tuple[str, str, str]] = [
             ("Plain Text", "*.txt", "text"),
             ("CSV", "*.csv", "csv"),
-            ("Markdown", "*.md", "md"),
+            ("Markdown", "*.md", "markdown"),
             ("XML", "*.xml", "xml"),
             ("JSON", "*.json", "json"),
-            ("1C Enterprise", "*.os", "1c-ent"),
             ("Python", "*.py", "python"),
             ("JavaScript", "*.js", "javascript"),
             ("TypeScript", "*.ts", "typescript"),
@@ -754,6 +784,7 @@ class NotepadLinuxWindow(Gtk.ApplicationWindow):
             ("C++", "*.cpp", "cpp"),
             ("Java", "*.java", "java"),
             ("Shell", "*.sh", "sh"),
+            ("1C Enterprise", "*.bsl;*.os", "1c-ent"),
             ("YAML", "*.yaml;*.yml", "yaml"),
             ("SQL", "*.sql", "sql"),
             ("Go", "*.go", "go"),
@@ -911,22 +942,20 @@ class NotepadLinuxWindow(Gtk.ApplicationWindow):
 
     def _toggle_wrap(self, menu_item: Gtk.CheckMenuItem) -> None:
         mode = Gtk.WrapMode.WORD_CHAR if menu_item.get_active() else Gtk.WrapMode.NONE
-        for i in range(self.notebook.get_n_pages()):
-            tab = self.notebook.get_nth_page(i)
-            if isinstance(tab, EditorTab):
-                tab.view.set_wrap_mode(mode)
+        for tab in self._iter_tabs():
+            tab.view.set_wrap_mode(mode)
 
     def _toggle_dark_theme(self, menu_item: Gtk.CheckMenuItem) -> None:
+        dark = menu_item.get_active()
         settings = Gtk.Settings.get_default()
-        settings.set_property("gtk-application-prefer-dark-theme", menu_item.get_active())
+        settings.set_property("gtk-application-prefer-dark-theme", dark)
+        _apply_editor_theme_css(dark)
         # Update the style scheme in every open tab to match the new theme.
         # notebook may not exist yet when called from _build_menu_bar (during __init__).
         nb = getattr(self, "notebook", None)
         if nb is not None:
-            for i in range(nb.get_n_pages()):
-                tab = nb.get_nth_page(i)
-                if isinstance(tab, EditorTab):
-                    tab._apply_style_scheme()
+            for tab in self._iter_tabs():
+                tab._apply_style_scheme()
 
     def _sync_encoding_menu_from_current_tab(self) -> None:
         tab = self._current_tab()
@@ -936,9 +965,18 @@ class NotepadLinuxWindow(Gtk.ApplicationWindow):
         item = self.encoding_menu_items.get(current)
         if not item:
             return
-        self._updating_encoding_menu = True
-        item.set_active(True)
-        self._updating_encoding_menu = False
+        if item.get_active():
+            return
+        handler_id = self.encoding_menu_handlers.get(current)
+        try:
+            self._updating_encoding_menu = True
+            if handler_id:
+                item.handler_block(handler_id)
+            item.set_active(True)
+        finally:
+            if handler_id:
+                item.handler_unblock(handler_id)
+            self._updating_encoding_menu = False
 
     def _on_encoding_selected(self, menu_item: Gtk.RadioMenuItem, encoding: str) -> None:
         if self._updating_encoding_menu or not menu_item.get_active():
@@ -946,7 +984,15 @@ class NotepadLinuxWindow(Gtk.ApplicationWindow):
         tab = self._current_tab()
         if not tab:
             return
-        tab.set_encoding(encoding)
+        try:
+            if tab.path and not tab.modified:
+                tab.reload_with_encoding(encoding)
+            else:
+                tab.set_encoding(encoding)
+        except Exception as exc:
+            self._error_dialog(f"Cannot reopen file with {encoding.upper()}:\n{exc}")
+            self._sync_encoding_menu_from_current_tab()
+            return
         self._refresh_tab_titles()
         self._update_status()
 
@@ -968,31 +1014,61 @@ class NotepadLinuxWindow(Gtk.ApplicationWindow):
         item = self.language_menu_items.get(current)
         if not item:
             return
-        self._updating_language_menu = True
-        item.set_active(True)
-        self._updating_language_menu = False
+        if item.get_active():
+            return
+        handler_id = self.language_menu_handlers.get(current)
+        try:
+            self._updating_language_menu = True
+            if handler_id:
+                item.handler_block(handler_id)
+            item.set_active(True)
+        finally:
+            if handler_id:
+                item.handler_unblock(handler_id)
+            self._updating_language_menu = False
 
     def _on_switch_page(self, *_args) -> None:
+        self._schedule_current_tab_ui_sync()
+
+    def _schedule_current_tab_ui_sync(self) -> None:
+        if self._ui_sync_source_id:
+            GLib.source_remove(self._ui_sync_source_id)
+        self._ui_sync_source_id = GLib.idle_add(
+            self._sync_current_tab_ui,
+            priority=GLib.PRIORITY_DEFAULT_IDLE,
+        )
+
+    def _sync_current_tab_ui(self) -> bool:
+        self._ui_sync_source_id = 0
         self._sync_encoding_menu_from_current_tab()
-        GLib.idle_add(self._sync_language_menu_from_current_tab, priority=GLib.PRIORITY_DEFAULT_IDLE)
-        GLib.idle_add(self._update_status, priority=GLib.PRIORITY_DEFAULT_IDLE)
+        self._sync_language_menu_from_current_tab()
+        self._update_status()
+        return False
 
     def _refresh_tab_titles(self) -> None:
-        for i in range(self.notebook.get_n_pages()):
-            tab = self.notebook.get_nth_page(i)
-            if isinstance(tab, EditorTab):
-                header = self.notebook.get_tab_label(tab)
-                if isinstance(header, Gtk.Box):
-                    children = header.get_children()
-                    if children and isinstance(children[0], Gtk.Label):
-                        children[0].set_text(tab.get_title())
+        for tab in self._iter_tabs():
+            header = self.notebook.get_tab_label(tab)
+            if isinstance(header, Gtk.Box):
+                label = self._tab_header_label(header)
+                if label:
+                    label.set_text(tab.get_title())
         self._update_status()
 
+    def _tab_header_label(self, header: Gtk.Box) -> Optional[Gtk.Label]:
+        for child in header.get_children():
+            if isinstance(child, Gtk.Label):
+                return child
+            if isinstance(child, Gtk.Bin):
+                nested = child.get_child()
+                if isinstance(nested, Gtk.Label):
+                    return nested
+        return None
+
     def _update_status(self) -> None:
+        self.status.pop(self.status_ctx)
         tab = self._current_tab()
         if not tab:
             return
-        self.status.pop(self.status_ctx)
         line, col = tab.cursor_position()
         name = str(tab.path) if tab.path else "Untitled"
         lang_label = LANG_LABELS.get(tab._language_id, tab._language_id)
@@ -1015,31 +1091,39 @@ class NotepadLinuxWindow(Gtk.ApplicationWindow):
     def _save_session(self) -> None:
         CONFIG_DIR.mkdir(parents=True, exist_ok=True)
         tabs = []
-        for i in range(self.notebook.get_n_pages()):
-            tab = self.notebook.get_nth_page(i)
-            if not isinstance(tab, EditorTab):
-                continue
+        for tab in self._iter_tabs():
             item = {"path": str(tab.path) if tab.path else None, "encoding": tab.encoding}
             if tab.path is None:
                 start, end = tab.buffer.get_bounds()
                 item["content"] = tab.buffer.get_text(start, end, True)
             tabs.append(item)
         payload = {"tabs": tabs, "active": self.notebook.get_current_page()}
-        SESSION_FILE.write_text(json.dumps(payload), encoding="utf-8")
+        self._write_json_atomic(SESSION_FILE, payload)
         self._save_settings()
 
-    def _load_session(self) -> None:
+    def _write_json_atomic(self, path: Path, payload: dict) -> None:
+        tmp_path = path.with_suffix(path.suffix + ".tmp")
+        tmp_path.write_text(json.dumps(payload), encoding="utf-8")
+        tmp_path.replace(path)
+
+    def _load_session(self) -> bool:
         if not SESSION_FILE.exists():
-            return
+            return False
         try:
             payload = json.loads(SESSION_FILE.read_text(encoding="utf-8"))
-        except Exception:
-            return
+            session_tabs = payload.get("tabs", [])
+            if not isinstance(session_tabs, list):
+                return False
+        except Exception as exc:
+            sys.stderr.write(f"Cannot load session: {exc}\n")
+            return False
 
         while self.notebook.get_n_pages() > 0:
             self.notebook.remove_page(0)
 
-        for item in payload.get("tabs", []):
+        for item in session_tabs:
+            if not isinstance(item, dict):
+                continue
             path = item.get("path")
             encoding = item.get("encoding", "utf-8")
             tab: EditorTab
@@ -1057,17 +1141,16 @@ class NotepadLinuxWindow(Gtk.ApplicationWindow):
             self._add_tab(tab)
 
         if self.notebook.get_n_pages() == 0:
-            self._new_tab()
+            return False
         active = payload.get("active", 0)
         self.notebook.set_current_page(max(0, min(active, self.notebook.get_n_pages() - 1)))
         self._sync_encoding_menu_from_current_tab()
         self._refresh_tab_titles()
         # Ensure style scheme is applied to all tabs after loading
         if hasattr(self, "_dark_item"):
-            for i in range(self.notebook.get_n_pages()):
-                tab = self.notebook.get_nth_page(i)
-                if isinstance(tab, EditorTab):
-                    tab._apply_style_scheme()
+            for tab in self._iter_tabs():
+                tab._apply_style_scheme()
+        return True
 
     def _on_quit(self) -> None:
         if not self._confirm_unsaved_before_quit():
@@ -1077,9 +1160,8 @@ class NotepadLinuxWindow(Gtk.ApplicationWindow):
 
     def _confirm_unsaved_before_quit(self) -> bool:
         unsaved = []
-        for i in range(self.notebook.get_n_pages()):
-            tab = self.notebook.get_nth_page(i)
-            if isinstance(tab, EditorTab) and tab.modified:
+        for tab in self._iter_tabs():
+            if tab.modified:
                 unsaved.append(tab.get_title())
         if not unsaved:
             return True
@@ -1122,21 +1204,28 @@ class NotepadLinuxApp(Gtk.Application):
             window = NotepadLinuxWindow(self)
 
         paths = []
+        unsupported = []
         for file in files:
             path = file.get_path()
             if path:
                 paths.append(Path(path))
+            else:
+                unsupported.append(file.get_uri())
 
         if isinstance(window, NotepadLinuxWindow):
             window.open_files(paths)
+            if unsupported:
+                window._error_dialog(
+                    "Only local files are supported:\n" + "\n".join(unsupported)
+                )
         else:
             window.present()
 
 
 def main() -> None:
     _install_warning_filters()
-    if os.path.isfile(ICON_PATH):
-        Gtk.Window.set_default_icon_from_file(ICON_PATH)
+    if ICON_PATH.exists():
+        Gtk.Window.set_default_icon_from_file(str(ICON_PATH))
     app = NotepadLinuxApp()
     app.run(sys.argv)
 
