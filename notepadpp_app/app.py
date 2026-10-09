@@ -30,6 +30,7 @@ from .config import (
     SETTINGS_FILE,
 )
 from .file_io import (
+    read_text,
     read_text_for_display as _read_text_for_display,
     read_text_with_detected_encoding,
     write_text_atomically,
@@ -1108,8 +1109,10 @@ class NotepadLinuxWindow(Gtk.ApplicationWindow):
             path = Path(item.path) if item.path else None
             if path and path.exists():
                 try:
-                    content = _read_text_for_display(path, item.encoding)
+                    content = read_text(path, item.encoding)
                     encoding = item.encoding
+                except UnicodeError:
+                    content, encoding = self._read_file_with_detected_encoding(path)
                 except (OSError, LookupError):
                     content, encoding = self._read_file_with_detected_encoding(path)
                 restored_tabs.append(
