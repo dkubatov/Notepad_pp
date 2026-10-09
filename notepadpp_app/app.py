@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import re
 import sys
 import webbrowser
@@ -30,17 +29,23 @@ from .config import (
     SESSION_FILE,
     SETTINGS_FILE,
 )
+from .file_io import (
+    read_text,
+    read_text_for_display as _read_text_for_display,
+    read_text_with_detected_encoding,
+    write_text_atomically,
+)
+from .persistence import (
+    SessionState,
+    SessionTab,
+    load_session,
+    load_settings,
+    save_session,
+    save_settings,
+)
 
 URL_PATTERN = re.compile(r"(https?://[^\s<>\"]+)")
 EDITOR_THEME_PROVIDER = Gtk.CssProvider()
-
-
-def _read_text_for_display(path: Path, encoding: str) -> str:
-    data = path.read_bytes()
-    try:
-        return data.decode(encoding)
-    except UnicodeError:
-        return data.decode(encoding, errors="replace")
 
 
 def _apply_editor_theme_css(dark: bool) -> None:
@@ -342,14 +347,19 @@ class EditorTab(Gtk.Box):
             return False
         start, end = self.buffer.get_bounds()
         text = self.buffer.get_text(start, end, True)
-        self.path.write_text(text, encoding=self.encoding)
+        write_text_atomically(self.path, text, self.encoding)
         self.buffer.set_modified(False)
         return True
 
     def save_as(self, path: Path) -> bool:
-        self.path = path
-        self._set_language_from_path(path)
-        return self.save()
+        start, end = self.buffer.get_bounds()
+        text = self.buffer.get_text(start, end, True)
+        write_text_atomically(path, text, self.encoding)
+        self.path = path.resolve()
+        self._set_language_from_path(self.path)
+        self._apply_style_scheme()
+        self.buffer.set_modified(False)
+        return True
 
     def set_encoding(self, encoding: str) -> None:
         if self.encoding == encoding:
@@ -471,24 +481,21 @@ class NotepadLinuxWindow(Gtk.ApplicationWindow):
 
     def _load_settings(self) -> dict:
         """Load persisted settings (word wrap, dark theme)."""
-        try:
-            if SETTINGS_FILE.exists():
-                return json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
-        except Exception:
-            pass
-        return {"word_wrap": False, "dark_theme": True}
+        return load_settings(SETTINGS_FILE)
 
     def _save_settings(self) -> None:
         """Persist current settings (word wrap, dark theme)."""
         CONFIG_DIR.mkdir(parents=True, exist_ok=True)
         try:
-            payload = {
-                "word_wrap": self._wrap_item.get_active() if hasattr(self, "_wrap_item") else False,
-                "dark_theme": self._dark_item.get_active() if hasattr(self, "_dark_item") else True,
-            }
-            self._write_json_atomic(SETTINGS_FILE, payload)
-        except Exception:
-            pass
+            save_settings(
+                SETTINGS_FILE,
+                {
+                    "word_wrap": self._wrap_item.get_active() if hasattr(self, "_wrap_item") else False,
+                    "dark_theme": self._dark_item.get_active() if hasattr(self, "_dark_item") else True,
+                },
+            )
+        except OSError as exc:
+            sys.stderr.write(f"Cannot save settings: {exc}\n")
 
     def _build_menu_bar(self) -> Gtk.MenuBar:
         menu_bar = Gtk.MenuBar()
@@ -664,19 +671,7 @@ class NotepadLinuxWindow(Gtk.ApplicationWindow):
         self._update_status()
 
     def _read_file_with_detected_encoding(self, path: Path) -> tuple[str, str]:
-        candidates = [enc for enc, _ in ENCODINGS]
-        seen = set()
-        ordered_candidates = []
-        for enc in candidates:
-            if enc not in seen:
-                ordered_candidates.append(enc)
-                seen.add(enc)
-        for encoding in ordered_candidates:
-            try:
-                return path.read_text(encoding=encoding), encoding
-            except UnicodeDecodeError:
-                continue
-        return path.read_text(encoding="utf-8", errors="replace"), "utf-8"
+        return read_text_with_detected_encoding(path)
 
     def open_file(self, path: Path) -> None:
         path = self._resolve_path(path)
@@ -1090,60 +1085,51 @@ class NotepadLinuxWindow(Gtk.ApplicationWindow):
 
     def _save_session(self) -> None:
         CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-        tabs = []
+        tabs: list[SessionTab] = []
         for tab in self._iter_tabs():
-            item = {"path": str(tab.path) if tab.path else None, "encoding": tab.encoding}
+            content = ""
             if tab.path is None:
                 start, end = tab.buffer.get_bounds()
-                item["content"] = tab.buffer.get_text(start, end, True)
-            tabs.append(item)
-        payload = {"tabs": tabs, "active": self.notebook.get_current_page()}
-        self._write_json_atomic(SESSION_FILE, payload)
+                content = tab.buffer.get_text(start, end, True)
+            tabs.append(
+                SessionTab(str(tab.path) if tab.path else None, tab.encoding, content)
+            )
+        save_session(
+            SESSION_FILE,
+            SessionState(tabs, self.notebook.get_current_page()),
+        )
         self._save_settings()
 
-    def _write_json_atomic(self, path: Path, payload: dict) -> None:
-        tmp_path = path.with_suffix(path.suffix + ".tmp")
-        tmp_path.write_text(json.dumps(payload), encoding="utf-8")
-        tmp_path.replace(path)
-
     def _load_session(self) -> bool:
-        if not SESSION_FILE.exists():
+        session = load_session(SESSION_FILE)
+        if session is None:
             return False
-        try:
-            payload = json.loads(SESSION_FILE.read_text(encoding="utf-8"))
-            session_tabs = payload.get("tabs", [])
-            if not isinstance(session_tabs, list):
-                return False
-        except Exception as exc:
-            sys.stderr.write(f"Cannot load session: {exc}\n")
-            return False
-
-        while self.notebook.get_n_pages() > 0:
-            self.notebook.remove_page(0)
-
-        for item in session_tabs:
-            if not isinstance(item, dict):
-                continue
-            path = item.get("path")
-            encoding = item.get("encoding", "utf-8")
-            tab: EditorTab
-            if path and Path(path).exists():
+        restored_tabs: list[EditorTab] = []
+        for item in session.tabs:
+            path = Path(item.path) if item.path else None
+            if path and path.exists():
                 try:
-                    content = Path(path).read_text(encoding=encoding)
-                except UnicodeDecodeError:
-                    content, encoding = self._read_file_with_detected_encoding(Path(path))
-                tab = EditorTab(path=Path(path), content=content, encoding=encoding)
+                    content = read_text(path, item.encoding)
+                    encoding = item.encoding
+                except UnicodeError:
+                    content, encoding = self._read_file_with_detected_encoding(path)
+                except (OSError, LookupError):
+                    content, encoding = self._read_file_with_detected_encoding(path)
+                restored_tabs.append(
+                    EditorTab(path=path, content=content, encoding=encoding)
+                )
             else:
-                tab = EditorTab(
-                    path=None, content=item.get("content", ""), encoding=encoding
+                restored_tabs.append(
+                    EditorTab(path=None, content=item.content, encoding=item.encoding)
                 )
 
-            self._add_tab(tab)
-
-        if self.notebook.get_n_pages() == 0:
+        if not restored_tabs:
             return False
-        active = payload.get("active", 0)
-        self.notebook.set_current_page(max(0, min(active, self.notebook.get_n_pages() - 1)))
+
+        for tab in restored_tabs:
+            self._add_tab(tab)
+        active = max(0, min(session.active, len(restored_tabs) - 1))
+        self.notebook.set_current_page(active)
         self._sync_encoding_menu_from_current_tab()
         self._refresh_tab_titles()
         # Ensure style scheme is applied to all tabs after loading
